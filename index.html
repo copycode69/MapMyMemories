@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>MapMyMemories – Free Version</title>
+
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #f4f4f4;
+    }
+
+    #map {
+      height: 100%;
+    }
+
+    .form-box {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background-color: #ffffff;
+      padding: 20px;
+      width: 280px;
+      z-index: 999;
+      border-radius: 10px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    }
+
+    .form-box h3 {
+      margin: 0 0 15px;
+      font-size: 18px;
+      color: #333;
+    }
+
+    input[type="text"], textarea, input[type="file"], button {
+      width: 100%;
+      padding: 8px 10px;
+      margin-top: 10px;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, textarea:focus {
+      border-color: #007BFF;
+      outline: none;
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+
+    button {
+      background-color: #007BFF;
+      color: white;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 15px;
+      transition: background-color 0.3s;
+    }
+
+    button:hover {
+      background-color: #0056b3;
+    }
+
+    #preview {
+      margin-top: 12px;
+      max-width: 100%;
+      border-radius: 6px;
+      display: none;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="form-box">
+    <h3>📍 Add a New Memory</h3>
+    <input type="file" id="imgInput" accept="image/*" />
+    <input type="text" id="title" placeholder="Memory Title" />
+    <textarea id="desc" placeholder="Memory Description"></textarea>
+    <button onclick="addMemory()">Pin to Map</button>
+    <img id="preview" alt="Image Preview" />
+  </div>
+
+  <div id="map"></div>
+
+  <script>
+    const imgbbAPIKey = "ef72e9462a0a02572688a4c3657212d5"; // 🔑 Replace with your ImgBB key
+    let selectedCoords = null;
+    let imageFile = null;
+
+    const map = L.map('map').setView([20.5937, 78.9629], 5);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    map.on("click", function (e) {
+      selectedCoords = e.latlng;
+      alert("📍 Location selected!");
+    });
+
+    document.getElementById("imgInput").addEventListener("change", function () {
+      imageFile = this.files[0];
+      if (imageFile) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const preview = document.getElementById("preview");
+          preview.src = e.target.result;
+          preview.style.display = "block";
+        };
+        reader.readAsDataURL(imageFile);
+      }
+    });
+
+    async function addMemory() {
+      if (!selectedCoords || !imageFile) {
+        alert("Please select a location on the map and upload an image.");
+        return;
+      }
+
+      const title = document.getElementById("title").value.trim();
+      const desc = document.getElementById("desc").value.trim();
+      if (!title || !desc) {
+        alert("Please fill in both title and description.");
+        return;
+      }
+
+      try {
+        const formData = new FormData();
+        formData.append("image", imageFile);
+
+        const res = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbAPIKey}`, {
+          method: "POST",
+          body: formData
+        });
+
+        const data = await res.json();
+        if (!data.success) throw new Error("Image upload failed");
+
+        const memory = {
+          title,
+          desc,
+          image: data.data.url,
+          lat: selectedCoords.lat,
+          lng: selectedCoords.lng,
+          date: new Date().toISOString()
+        };
+
+        const allMemories = JSON.parse(localStorage.getItem("memories")) || [];
+        allMemories.push(memory);
+        localStorage.setItem("memories", JSON.stringify(allMemories));
+
+        const marker = L.marker([memory.lat, memory.lng]).addTo(map);
+        marker.bindPopup(`
+          <strong>${memory.title}</strong><br>
+          ${memory.desc}<br>
+          <img src="${memory.image}" style="max-width:200px; border-radius:6px;" />
+        `);
+
+        document.getElementById("title").value = "";
+        document.getElementById("desc").value = "";
+        document.getElementById("imgInput").value = "";
+        document.getElementById("preview").style.display = "none";
+        selectedCoords = null;
+        imageFile = null;
+
+        alert("✅ Memory pinned successfully!");
+      } catch (err) {
+        alert("❌ Error: " + err.message);
+      }
+    }
+
+    // Load saved memories
+    const saved = JSON.parse(localStorage.getItem("memories")) || [];
+    saved.forEach((m) => {
+      const marker = L.marker([m.lat, m.lng]).addTo(map);
+      marker.bindPopup(`
+        <strong>${m.title}</strong><br>
+        ${m.desc}<br>
+        <img src="${m.image}" style="max-width:200px; border-radius:6px;" />
+      `);
+    });
+  </script>
+</body>
+</html>
