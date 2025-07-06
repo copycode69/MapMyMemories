@@ -29,4 +29,4 @@ A lightweight web app that lets you pin memories to a map with a title, descript
 1. **Clone or download this repository**
 
    ```bash
-   git clone https://github.com/your-username/map-my-memories.git
+   git clone https://github.com/copycode69/map-my-memories.git
